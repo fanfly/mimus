@@ -4,7 +4,7 @@ CFLAGS = -std=c11 -O3
 
 all: bin/tokenize
 
-bin/tokenize: tools/tokenize.c
+bin/tokenize: tools/tokenize.c lib/gguf.c
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $^ -o $@
 

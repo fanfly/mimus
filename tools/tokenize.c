@@ -13,22 +13,22 @@ char *duplicate_string(const char *source) {
     return target;
 }
 
-typedef struct {
+struct arg_pack {
     char *model_path;
-} ArgumentPack;
+};
 
-ArgumentPack *create_argument_pack() {
-    ArgumentPack *pack = malloc(sizeof(ArgumentPack));
+struct arg_pack *create_argument_pack() {
+    struct arg_pack *pack = malloc(sizeof(struct arg_pack));
     pack->model_path = NULL;
     return pack;
 }
 
-void destroy_argument_pack(ArgumentPack *pack) {
+void destroy_argument_pack(struct arg_pack *pack) {
     free(pack->model_path);
     free(pack);
 }
 
-bool parse(char **args, int count, ArgumentPack *pack) {
+bool parse_arg(char **args, int count, struct arg_pack *pack) {
     int index = 1;
     while (index < count) {
         if (strcmp(args[index], "-m") == 0) {
@@ -46,30 +46,24 @@ void print_usage() {
     puts("Usage: tokenize [-m MODEL_PATH]");
 }
 
+void parse_gguf(FILE *file);
+
 int main(int argc, char **argv) {
-    ArgumentPack *arg_pack = create_argument_pack();
-    if (!parse(argv, argc, arg_pack) || arg_pack->model_path == NULL) {
+    struct arg_pack *args = create_argument_pack();
+    if (!parse_arg(argv, argc, args) || args->model_path == NULL) {
         print_usage();
-        destroy_argument_pack(arg_pack);
+        destroy_argument_pack(args);
         return 1;
     }
-    FILE *model_file = fopen(arg_pack->model_path, "rb");
+    FILE *model_file = fopen(args->model_path, "rb");
     if (model_file == NULL) {
-        printf("Failed: cannot be open %s\n", arg_pack->model_path);
-        destroy_argument_pack(arg_pack);
+        printf("Failed: cannot be open %s\n", args->model_path);
+        destroy_argument_pack(args);
         return 1;
     }
-    fseek(model_file, 8, SEEK_SET);
-    unsigned long long tensor_count = 0;
-    if (fread(&tensor_count, 8, 1, model_file) != 1) {
-        printf("Failed: cannot be get number of tensors\n");
-        fclose(model_file);
-        destroy_argument_pack(arg_pack);
-        return 1;
-    }
-    printf("Number of tensors: %llu\n", tensor_count);
+    parse_gguf(model_file);
     fclose(model_file);
     puts("Unfortunately, tokenization is not currently supported.");
-    destroy_argument_pack(arg_pack);
+    destroy_argument_pack(args);
     return 1;
 }
