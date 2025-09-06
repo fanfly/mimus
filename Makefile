@@ -2,9 +2,9 @@ CFLAGS = -std=c11 -O3
 
 .PHONY: all clean
 
-all: bin/tokenize
+all: bin/mimus-tokenize
 
-bin/tokenize: tools/tokenize.c lib/gguf.c
+bin/mimus-tokenize: tools/tokenize.c lib/gguf.c
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $^ -o $@
 

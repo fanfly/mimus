@@ -43,7 +43,7 @@ bool parse_arg(char **args, int count, struct arg_pack *pack) {
 }
 
 void print_usage() {
-    puts("Usage: tokenize [-m MODEL_PATH]");
+    puts("Usage: mimus-tokenize -m MODEL_PATH");
 }
 
 void parse_gguf(FILE *file);
@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
     }
     parse_gguf(model_file);
     fclose(model_file);
-    puts("Unfortunately, tokenization is not currently supported.");
+    puts("Unfortunately, mimus-tokenize is still under development.");
     destroy_argument_pack(args);
     return 1;
 }
