@@ -2,11 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-
-struct variant {
-    uint32_t type;
-    unsigned char data[8];
-};
+#include <string.h>
 
 char *load_string(FILE *file) {
     uint64_t length;
@@ -17,42 +13,97 @@ char *load_string(FILE *file) {
     return string;
 }
 
-void throw_typed_value(FILE *file, uint32_t type);
-
-void throw_array(FILE *file) {
-    uint32_t element_type;
-    fread(&element_type, sizeof(element_type), 1, file);
-    uint64_t length;
-    fread(&length, sizeof(length), 1, file);
-    for (int index = 0; index < length; ++index) {
-        throw_typed_value(file, element_type);
+size_t size_of_scalar_type(uint32_t type) {
+    if (type == 0 || type == 1 || type == 7) {
+        return 1;
     }
+    if (type == 2 || type == 3) {
+        return 2;
+    }
+    if (type == 4 || type == 5 || type == 6) {
+        return 4;
+    }
+    if (type == 10 || type == 11 || type == 12) {
+        return 8;
+    }
+    return 0;
 }
 
-void throw_value(FILE *file) {
-    uint32_t value_type;
-    fread(&value_type, sizeof(value_type), 1, file);
-    throw_typed_value(file, value_type);
-}
-
-void throw_typed_value(FILE *file, uint32_t type) {
-    if (type != 8 && type != 9) {
-        struct variant value;
-        value.type = type;
-        if (type == 0 || type == 1 || type == 7) {
-            fread(&value.data, 1, 1, file);
-        } else if (type == 2 || type == 3) {
-            fread(&value.data, 1, 2, file);
-        } else if (type == 4 || type == 5 || type == 6) {
-            fread(&value.data, 1, 4, file);
-        } else if (type == 10 || type == 11 || type == 12) {
-            fread(&value.data, 1, 8, file);
+size_t load_typed_value(FILE *file, uint32_t type, unsigned char **value) {
+    if (type == 8) {
+        uint64_t length;
+        fread(&length, sizeof(length), 1, file);
+        *value = malloc(sizeof(length) + length);
+        memcpy(*value, &length, sizeof(length));
+        fread(*value + sizeof(length), 1, length, file);
+        return sizeof(length) + length;
+    }
+    if (type == 9) {
+        uint32_t element_type;
+        fread(&element_type, sizeof(element_type), 1, file);
+        uint64_t length;
+        fread(&length, sizeof(length), 1, file);
+        size_t size_sum = 0;
+        unsigned char **elements = malloc(sizeof(unsigned char *) * length);
+        size_t *sizes = malloc(sizeof(size_t) * length);
+        for (int index = 0; index < length; ++index) {
+            sizes[index] = load_typed_value(
+                file, element_type, &elements[index]
+            );
+            size_sum += sizes[index];
         }
+        *value = malloc(sizeof(element_type) + sizeof(length) + size_sum);
+        unsigned char *target = *value;
+        memcpy(target, &element_type, sizeof(element_type));
+        target += sizeof(element_type);
+        memcpy(target, &length, sizeof(length));
+        target += sizeof(length);
+        for (int index = 0; index < length; ++index) {
+            memcpy(target, elements[index], sizes[index]);
+            target += sizes[index];
+            free(elements[index]);
+        }
+        free(elements);
+        free(sizes);
+        return sizeof(element_type) + sizeof(length) + size_sum;
+    }
+    size_t value_size = size_of_scalar_type(type);
+    *value = malloc(value_size);
+    fread(*value, 1, value_size, file);
+    return value_size;
+}
+
+void print_typed_value(uint32_t type, unsigned char *value) {
+    if (type == 4) {
+        printf("%" PRIu32, *(uint32_t *)value);
+    } else if (type == 5) {
+        printf("%" PRId32, *(int32_t *)value);
+    } else if (type == 6) {
+        printf("%f", *(float *)value);
     } else if (type == 8) {
-        char *value = load_string(file);
-        free(value);
+        putchar('"');
+        uint64_t length = *(uint64_t *)value;
+        char *string = (char *)(value + sizeof(length));
+        for (int index = 0; index < length; ++index) {
+            if (string[index] == '\n') {
+                printf("\\n");
+            } else if (string[index] == '"') {
+                printf("\\\"");
+            } else {
+                putchar(string[index]);
+            }
+        }
+        putchar('"');
+    } else if (type == 9) {
+        uint32_t element_type = *(uint32_t *)value;
+        uint64_t length = *(uint64_t *)(value + sizeof(element_type));
+        printf(
+            "[type-%" PRIu32 " array of length %" PRIu64 "]",
+            element_type,
+            length
+        );
     } else {
-        throw_array(file);
+        printf("[type-%" PRIu32 " value]", type);
     }
 }
 
@@ -68,8 +119,14 @@ void parse_gguf(FILE *file) {
     printf("Number of keys: %" PRIu64 "\n", key_count);
     for (int key_index = 0; key_index < key_count; ++key_index) {
         char *key = load_string(file);
-        printf("[%d] %s\n", key_index, key);
-        throw_value(file);
+        printf("[%d] %s: ", key_index, key);
+        uint32_t type;
+        fread(&type, 1, sizeof(type), file);
+        unsigned char *value;
+        load_typed_value(file, type, &value);
+        print_typed_value(type, value);
+        puts("");
+        free(value);
         free(key);
     }
     printf("\n");
