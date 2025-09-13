@@ -46,7 +46,7 @@ void print_usage() {
     puts("Usage: mimus-tokenize -m MODEL_PATH");
 }
 
-void parse_gguf(FILE *file);
+void print_gguf_metadata(char *model_path);
 
 int main(int argc, char **argv) {
     struct arg_pack *args = create_argument_pack();
@@ -55,15 +55,7 @@ int main(int argc, char **argv) {
         destroy_argument_pack(args);
         return 1;
     }
-    FILE *model_file = fopen(args->model_path, "rb");
-    if (model_file == NULL) {
-        printf("Failed: cannot be open %s\n", args->model_path);
-        destroy_argument_pack(args);
-        return 1;
-    }
-    parse_gguf(model_file);
-    fclose(model_file);
-    puts("Unfortunately, mimus-tokenize is still under development.");
+    print_gguf_metadata(args->model_path);
     destroy_argument_pack(args);
-    return 1;
+    return 0;
 }

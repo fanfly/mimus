@@ -1,4 +1,5 @@
 #include <inttypes.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -73,13 +74,16 @@ size_t load_typed_value(FILE *file, uint32_t type, unsigned char **value) {
     return value_size;
 }
 
-void print_typed_value(uint32_t type, unsigned char *value) {
+size_t print_typed_value(uint32_t type, unsigned char *value) {
     if (type == 4) {
         printf("%" PRIu32, *(uint32_t *)value);
+        return sizeof(uint32_t);
     } else if (type == 5) {
         printf("%" PRId32, *(int32_t *)value);
+        return sizeof(int32_t);
     } else if (type == 6) {
         printf("%f", *(float *)value);
+        return sizeof(float);
     } else if (type == 8) {
         putchar('"');
         uint64_t length = *(uint64_t *)value;
@@ -89,25 +93,69 @@ void print_typed_value(uint32_t type, unsigned char *value) {
                 printf("\\n");
             } else if (string[index] == '"') {
                 printf("\\\"");
+            } else if ((unsigned char)string[index] >= (unsigned char)'\x80') {
+                printf("\\x%x", (unsigned char)string[index]);
             } else {
                 putchar(string[index]);
             }
         }
         putchar('"');
+        return sizeof(uint64_t) + length;
     } else if (type == 9) {
         uint32_t element_type = *(uint32_t *)value;
         uint64_t length = *(uint64_t *)(value + sizeof(element_type));
-        printf(
-            "[type-%" PRIu32 " array of length %" PRIu64 "]",
-            element_type,
-            length
-        );
+        printf("{");
+        unsigned char *current = value + sizeof(uint32_t) + sizeof(uint64_t);
+        size_t limit = 16;
+        for (int index = 0; index < length && index < limit; ++index) {
+            if (index > 0) {
+                printf(", ");
+            }
+            size_t size = print_typed_value(element_type, current);
+            current += size;
+            if (index + 1 == limit && index + 1 != length) {
+                printf(", ...");
+            }
+        }
+        printf("} (%" PRIu64 " elements)", length);
     } else {
-        printf("[type-%" PRIu32 " value]", type);
+        printf("(type-%" PRIu32 " value)", type);
     }
 }
 
-void parse_gguf(FILE *file) {
+struct record {
+    char *key;
+    uint32_t type;
+    void *value;
+};
+
+void load_record(FILE *file, struct record *record) {
+    record->key = load_string(file);
+    fread(&record->type, 1, sizeof(record->type), file);
+    unsigned char *value;
+    load_typed_value(file, record->type, &value);
+    record->value = value;
+}
+
+void print_record(struct record *record) {
+    printf("%s: ", record->key);
+    if (strcmp(record->key, "tokenizer.chat_template") == 0) {
+        printf("(chat template)");
+    } else {
+        print_typed_value(record->type, record->value);
+    }
+}
+
+void clean_record(struct record *record) {
+    free(record->key);
+    free(record->value);
+}
+
+void print_gguf_metadata(char *model_path) {
+    FILE *file = fopen(model_path, "rb");
+    if (file == NULL) {
+        return;
+    }
     uint32_t magic;
     fread(&magic, sizeof(magic), 1, file);
     uint32_t version;
@@ -118,18 +166,13 @@ void parse_gguf(FILE *file) {
     fread(&key_count, sizeof(key_count), 1, file);
     printf("Number of keys: %" PRIu64 "\n", key_count);
     for (int key_index = 0; key_index < key_count; ++key_index) {
-        char *key = load_string(file);
-        printf("[%d] %s: ", key_index, key);
-        uint32_t type;
-        fread(&type, 1, sizeof(type), file);
-        unsigned char *value;
-        load_typed_value(file, type, &value);
-        print_typed_value(type, value);
+        struct record record;
+        load_record(file, &record);
+        printf("[%d] ", key_index);
+        print_record(&record);
         puts("");
-        free(value);
-        free(key);
+        clean_record(&record);
     }
-    printf("\n");
     printf("Number of tensors: %" PRIu64 "\n", tensor_count);
     for (int tensor_index = 0; tensor_index < tensor_count; ++tensor_index) {
         char *name = load_string(file);
@@ -143,5 +186,6 @@ void parse_gguf(FILE *file) {
         printf("[%d] %s\n", tensor_index, name);
         free(name);
     }
-    printf("\n");
+    fclose(file);
 }
+
