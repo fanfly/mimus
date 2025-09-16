@@ -6,7 +6,7 @@ all: bin/mimus-tokenize
 
 bin/mimus-tokenize: tools/tokenize.c lib/gguf.c
 	mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) -Ilib/include $^ -o $@
 
 clean:
 	rm -rf bin

@@ -1,8 +1,11 @@
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+
+#include "gguf.h"
 
 // Returns a pointer to a duplicate of the string pointed by 'source'.
 // The returned pointer must be freed later.
@@ -46,8 +49,6 @@ void print_usage() {
     puts("Usage: mimus-tokenize -m MODEL_PATH");
 }
 
-void print_gguf_metadata(char *model_path);
-
 int main(int argc, char **argv) {
     struct arg_pack *args = create_argument_pack();
     if (!parse_arg(argv, argc, args) || args->model_path == NULL) {
@@ -55,7 +56,13 @@ int main(int argc, char **argv) {
         destroy_argument_pack(args);
         return 1;
     }
-    print_gguf_metadata(args->model_path);
+    const char *model_path = args->model_path;
+    struct tokenizer_metadata *meta = create_tokenizer_metadata(model_path);
+    printf("Vocabulary size: %" PRIu64 "\n", meta->vocab_size);
+    for (int index = 0; index < meta->vocab_size; ++index) {
+        printf("[%d] \"%s\"\n", index, meta->vocab[index]);
+    }
+    destroy_tokenizer_metadata(meta);
     destroy_argument_pack(args);
     return 0;
 }

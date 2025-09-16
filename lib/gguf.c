@@ -102,10 +102,12 @@ size_t print_typed_value(uint32_t type, unsigned char *value) {
         putchar('"');
         return sizeof(uint64_t) + length;
     } else if (type == 9) {
-        uint32_t element_type = *(uint32_t *)value;
-        uint64_t length = *(uint64_t *)(value + sizeof(element_type));
+        unsigned char *current = value;
+        uint32_t element_type = *(uint32_t *)current;
+        current += sizeof(element_type);
+        uint64_t length = *(uint64_t *)current;
+        current += sizeof(length);
         printf("{");
-        unsigned char *current = value + sizeof(uint32_t) + sizeof(uint64_t);
         size_t limit = 16;
         for (int index = 0; index < length && index < limit; ++index) {
             if (index > 0) {
@@ -118,8 +120,10 @@ size_t print_typed_value(uint32_t type, unsigned char *value) {
             }
         }
         printf("} (%" PRIu64 " elements)", length);
+        return current - (value + sizeof(uint32_t) + sizeof(uint64_t));
     } else {
         printf("(type-%" PRIu32 " value)", type);
+        return 0;
     }
 }
 
@@ -151,7 +155,21 @@ void clean_record(struct record *record) {
     free(record->value);
 }
 
-void print_gguf_metadata(char *model_path) {
+size_t get_record_length(struct record *record) {
+    unsigned char *current = record->value;
+    if (record->type == 8) {
+        uint64_t length = *(uint64_t *)current;
+        return length;
+    }
+    if (record->type == 9) {
+        current += sizeof(uint32_t);
+        uint64_t length = *(uint64_t *)current;
+        return length;
+    }
+    return 0;
+}
+
+void print_gguf_metadata(const char *model_path) {
     FILE *file = fopen(model_path, "rb");
     if (file == NULL) {
         return;
@@ -189,3 +207,56 @@ void print_gguf_metadata(char *model_path) {
     fclose(file);
 }
 
+struct tokenizer_metadata {
+    uint64_t vocab_size;
+    char **vocab;
+};
+
+struct tokenizer_metadata *create_tokenizer_metadata(const char *model_path) {
+    FILE *file = fopen(model_path, "rb");
+    if (file == NULL) {
+        return NULL;
+    }
+    struct tokenizer_metadata *meta = malloc(sizeof(*meta));
+    uint32_t magic;
+    fread(&magic, sizeof(magic), 1, file);
+    uint32_t version;
+    fread(&version, sizeof(version), 1, file);
+    uint64_t tensor_count;
+    fread(&tensor_count, sizeof(tensor_count), 1, file);
+    uint64_t key_count;
+    fread(&key_count, sizeof(key_count), 1, file);
+    for (int key_index = 0; key_index < key_count; ++key_index) {
+        struct record record;
+        load_record(file, &record);
+        if (strcmp(record.key, "tokenizer.ggml.tokens") == 0) {
+            meta->vocab_size = get_record_length(&record);
+            unsigned char *current = record.value;
+            current += sizeof(uint32_t);
+            uint64_t length = *(uint64_t *)current;
+            meta->vocab_size = length;
+            current += sizeof(length);
+            meta->vocab = malloc(sizeof(*(meta->vocab)) * meta->vocab_size);
+            for (int index = 0; index < length; ++index) {
+                uint64_t string_length = *(uint64_t *)current;
+                current += sizeof(string_length);
+                char *string = (char *)current;
+                meta->vocab[index] = malloc(string_length + 1);
+                memcpy(meta->vocab[index], string, string_length);
+                meta->vocab[index][string_length] = '\0';
+                current += string_length;
+            }
+        }
+        clean_record(&record);
+    }
+    fclose(file);
+    return meta;
+}
+
+void destroy_tokenizer_metadata(struct tokenizer_metadata *meta) {
+    for (int index = 0; index < meta->vocab_size; ++index) {
+        free(meta->vocab[index]);
+    }
+    free(meta->vocab);
+    free(meta);
+}
