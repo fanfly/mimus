@@ -4,7 +4,7 @@ CFLAGS = -std=c11 -O3
 
 all: bin/mimus-tokenize
 
-bin/mimus-tokenize: tools/tokenize.c lib/gguf.c
+bin/mimus-tokenize: tools/tokenize.c lib/array.c lib/gguf.c
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -Ilib/include $^ -o $@
 
