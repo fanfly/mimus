@@ -58,10 +58,31 @@ int main(int argc, char **argv) {
     }
     const char *model_path = args->model_path;
     struct tokenizer_metadata *meta = create_tokenizer_metadata(model_path);
-    printf("Vocabulary size: %" PRIu64 "\n", meta->vocab_size);
-    for (int index = 0; index < meta->vocab_size; ++index) {
-        printf("[%d] \"%s\"\n", index, meta->vocab[index]);
+    char prompt[1024];
+    int count = fread(prompt, 1, 1024, stdin);
+    scanf("%s", prompt);
+    printf("[");
+    for (int i = 0; i < count; ++i) {
+        char c = prompt[i];
+        char token[3] = {c};
+        if (c == ' ') {
+            token[0] = '\xc4';
+            token[1] = '\xa0';
+            token[2] = '\0';
+        }
+        int id = -1;
+        for (int j = 0; j < meta->vocab_size; ++j) {
+            if (strcmp(meta->vocab[j], token) == 0) {
+                id = j;
+                break;
+            }
+        }
+        if (i > 0) {
+            printf(", ");
+        }
+        printf("%d", id);
     }
+    printf("]\n");
     destroy_tokenizer_metadata(meta);
     destroy_argument_pack(args);
     return 0;
