@@ -2,7 +2,7 @@
 import argparse
 import sys
 
-def main():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog='tokenize')
     parser.add_argument(
         '-m',
@@ -10,8 +10,9 @@ def main():
         help='path to the model file',
         required=True,
     )
-    args = parser.parse_args()
+    return parser.parse_args()
 
+def tokenize(text: str, model_path: str) -> list[int]:
     import transformers
 
     def get_tokenizer(gguf_path: str) -> transformers.PreTrainedTokenizer:
@@ -21,10 +22,12 @@ def main():
             legacy=False,
         )
 
-    prompt = sys.stdin.read()
-    tokenizer = get_tokenizer(args.model_path)
-    tokens = tokenizer.encode(prompt)
-    print(tokens)
+    tokenizer = get_tokenizer(model_path)
+    tokens = tokenizer.encode(text)
+    return tokens
 
 if __name__ == '__main__':
-    main()
+    args = parse_args()
+    prompt = sys.stdin.read()
+    tokens = tokenize(prompt, args.model_path)
+    print(tokens)
