@@ -60,7 +60,6 @@ int main(int argc, char **argv) {
     struct tokenizer_metadata *meta = create_tokenizer_metadata(model_path);
     char prompt[1024];
     int count = fread(prompt, 1, 1024, stdin);
-    scanf("%s", prompt);
     printf("[");
     for (int i = 0; i < count; ++i) {
         char c = prompt[i];
