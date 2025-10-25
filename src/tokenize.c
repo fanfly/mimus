@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
     struct tokenizer_metadata *meta = create_tokenizer_metadata(model_path);
     char prompt[1024];
     int count = fread(prompt, 1, 1024, stdin);
-    uint32_t *tokens = allocate_array(1, 1024);
+    uint32_t *tokens = allocate_array(sizeof(uint32_t), 1024);
     for (int i = 0; i < count; ++i) {
         char character[3];
         if (prompt[i] == ' ') {
