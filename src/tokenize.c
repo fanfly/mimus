@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdint.h>
 
+#include "array.h"
 #include "gguf.h"
 
 // Returns a pointer to a duplicate of the string pointed by 'source'.
@@ -60,28 +61,32 @@ int main(int argc, char **argv) {
     struct tokenizer_metadata *meta = create_tokenizer_metadata(model_path);
     char prompt[1024];
     int count = fread(prompt, 1, 1024, stdin);
-    printf("[");
+    uint32_t *tokens = allocate_array(1, 1024);
     for (int i = 0; i < count; ++i) {
-        char c = prompt[i];
-        char token[3] = {c};
-        if (c == ' ') {
-            token[0] = '\xc4';
-            token[1] = '\xa0';
-            token[2] = '\0';
+        char character[3];
+        if (prompt[i] == ' ') {
+            strcpy(character, "\xc4\xa0");
+        } else {
+            character[0] = prompt[i];
+            character[1] = '\0';
         }
-        int id = -1;
+        tokens[i] = (uint32_t)-1;
         for (int j = 0; j < meta->vocab_size; ++j) {
-            if (strcmp(meta->vocab[j], token) == 0) {
-                id = j;
+            if (strcmp(meta->vocab[j], character) == 0) {
+                tokens[i] = j;
                 break;
             }
         }
+    }
+    printf("[");
+    for (int i = 0; i < count; ++i) {
         if (i > 0) {
             printf(", ");
         }
-        printf("%d", id);
+        printf("%" PRIu32, tokens[i]);
     }
     printf("]\n");
+    destroy_array(tokens);
     destroy_tokenizer_metadata(meta);
     destroy_argument_pack(args);
     return 0;
