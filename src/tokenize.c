@@ -5,8 +5,8 @@
 #include <string.h>
 #include <stdint.h>
 
-#include "array.h"
 #include "gguf.h"
+#include "sequence.h"
 
 // Returns a pointer to a duplicate of the string pointed by 'source'.
 // The returned pointer must be freed later.
@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
     struct tokenizer_metadata *meta = create_tokenizer_metadata(model_path);
     char prompt[1024];
     int count = fread(prompt, 1, 1024, stdin);
-    uint32_t *tokens = allocate_array(sizeof(uint32_t), 1024);
+    uint32_t *tokens = sequence_create(sizeof(uint32_t));
     for (int i = 0; i < count; ++i) {
         char character[3];
         if (prompt[i] == ' ') {
@@ -70,13 +70,14 @@ int main(int argc, char **argv) {
             character[0] = prompt[i];
             character[1] = '\0';
         }
-        tokens[i] = (uint32_t)-1;
+        uint32_t token = (uint32_t)-1;
         for (int j = 0; j < meta->vocab_size; ++j) {
             if (strcmp(meta->vocab[j], character) == 0) {
-                tokens[i] = j;
+                token = j;
                 break;
             }
         }
+        tokens = sequence_append(tokens, &token);
     }
     printf("[");
     for (int i = 0; i < count; ++i) {
@@ -86,7 +87,7 @@ int main(int argc, char **argv) {
         printf("%" PRIu32, tokens[i]);
     }
     printf("]\n");
-    destroy_array(tokens);
+    sequence_destroy(tokens);
     destroy_tokenizer_metadata(meta);
     destroy_argument_pack(args);
     return 0;

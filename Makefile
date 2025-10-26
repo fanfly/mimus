@@ -4,7 +4,7 @@ CFLAGS = -std=c11 -O3
 
 all: bin/mimus-tokenize
 
-bin/mimus-tokenize: src/tokenize.c src/array.c src/gguf.c
+bin/mimus-tokenize: include/gguf.h include/sequence.h src/gguf.c src/sequence.c src/tokenize.c
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -Iinclude $^ -o $@
 
