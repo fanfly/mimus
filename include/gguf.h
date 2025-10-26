@@ -1,5 +1,5 @@
-#ifndef GGUF_H
-#define GGUF_H
+#ifndef GGUF_H_
+#define GGUF_H_
 
 #include <stdint.h>
 
@@ -12,4 +12,4 @@ void print_gguf_metadata(const char *model_path);
 struct tokenizer_metadata *create_tokenizer_metadata(const char *model_path);
 void destroy_tokenizer_metadata(struct tokenizer_metadata *meta);
 
-#endif // GGUF_H
+#endif // GGUF_H_
