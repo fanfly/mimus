@@ -4,55 +4,46 @@
 #include <stdio.h>
 #include "sequence.h"
 
-struct sequence_header {
-    size_t element_size;
+struct sequence {
+    size_t size;
     size_t count;
     size_t capacity;
+    void *data;
 };
 
-const size_t SEQ_HEADER_SIZE = sizeof(struct sequence_header);
-
-struct sequence_header *sequence_header(void *data) {
-    return (struct sequence_header *)((unsigned char *)data - SEQ_HEADER_SIZE);
+struct sequence *sequence_create(size_t size) {
+    struct sequence *sequence = malloc(sizeof(*sequence));
+    sequence->size = size;
+    sequence->count = 0;
+    sequence->capacity = 0;
+    sequence->data = NULL;
+    return sequence;
 }
 
-void *sequence_create(size_t element_size) {
-    struct sequence_header *header = malloc(SEQ_HEADER_SIZE);
-    header->element_size = element_size;
-    header->count = 0;
-    header->capacity = 0;
-    void *data = (unsigned char *)header + SEQ_HEADER_SIZE;
-    return data;
+size_t sequence_count(struct sequence *sequence) {
+    return sequence->count;
 }
 
-size_t sequence_count(void *data) {
-    return sequence_header(data)->count;
+void *sequence_get(struct sequence *sequence, size_t index) {
+    return (unsigned char *)sequence->data + sequence->size * index;
 }
 
-void *sequence_reallocate(void *data, size_t capacity) {
-    struct sequence_header *header = sequence_header(data);
-    size_t total_size = SEQ_HEADER_SIZE + header->element_size * capacity;
-    header = realloc(header, total_size);
-    header->capacity = capacity;
-    data = (unsigned char *)header + SEQ_HEADER_SIZE;
-    return data;
+void sequence_reallocate(struct sequence *sequence, size_t capacity) {
+    sequence->data = realloc(sequence->data, sequence->size * capacity);
+    sequence->capacity = capacity;
 }
 
-void *sequence_append(void *data, void *element) {
-    struct sequence_header *header = sequence_header(data);
-    printf("%d\n", (int)header->capacity);
-    if (header->count == header->capacity) {
-        size_t capacity = header->capacity == 0 ? 1 : header->capacity * 2;
-        data = sequence_reallocate(data, capacity);
-        header = sequence_header(data);
+void sequence_append(struct sequence *sequence, void *element) {
+    if (sequence->count == sequence->capacity) {
+        size_t new_capacity = sequence->count == 0 ? 1 : sequence->count * 2;
+        sequence_reallocate(sequence, new_capacity);
     }
-    void *target = (unsigned char *)data + header->element_size * header->count;
-    memcpy(target, element, header->element_size);
-    ++header->count;
-    return data;
+    void *target = sequence_get(sequence, sequence->count);
+    memcpy(target, element, sequence->size);
+    ++sequence->count;
 }
 
-void sequence_destroy(void *data) {
-    struct sequence_header *header = sequence_header(data);
-    free(header);
+void sequence_destroy(struct sequence *sequence) {
+    free(sequence->data);
+    free(sequence);
 }

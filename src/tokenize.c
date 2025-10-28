@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
     struct tokenizer_metadata *meta = create_tokenizer_metadata(model_path);
     char prompt[1024];
     int count = fread(prompt, 1, 1024, stdin);
-    uint32_t *tokens = sequence_create(sizeof(uint32_t));
+    struct sequence *tokens = sequence_create(sizeof(uint32_t));
     for (int i = 0; i < count; ++i) {
         char character[3];
         if (prompt[i] == ' ') {
@@ -77,14 +77,14 @@ int main(int argc, char **argv) {
                 break;
             }
         }
-        tokens = sequence_append(tokens, &token);
+        sequence_append(tokens, &token);
     }
     printf("[");
     for (int i = 0; i < count; ++i) {
         if (i > 0) {
             printf(", ");
         }
-        printf("%" PRIu32, tokens[i]);
+        printf("%" PRIu32, *(uint32_t *)sequence_get(tokens, i));
     }
     printf("]\n");
     sequence_destroy(tokens);
